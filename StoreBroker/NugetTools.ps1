@@ -298,7 +298,7 @@ function Get-NugetPackageDllPath
         [switch] $NoStatus
     )
 
-    Write-Log -Message "Looking for $AssemblyName" -Level Verbose
+    Write-Log -Message "Looking for $AssemblyName [$NugetPackageVersion]" -Level Verbose
 
     # First we'll check to see if the user has cached the assembly into the module's script directory
     $moduleAssembly = Join-Path $PSScriptRoot $AssemblyName
@@ -373,7 +373,7 @@ function Get-NugetPackageDllPath
         return $cachedAssemblyPath
     }
 
-    $output = "Unable to acquire a reference to $AssemblyName."
+    $output = "Unable to acquire a reference to $AssemblyName [$NugetPackageVersion]."
     Write-Log -Message $output -Level Error
     throw $output
 }
