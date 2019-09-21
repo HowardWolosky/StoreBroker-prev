@@ -874,125 +874,131 @@ function Set-StoreFile
     $origDefaultConnectionLimit = [System.Net.ServicePointManager]::DefaultConnectionLimit
     $origExpect100Continue = [System.Net.ServicePointManager]::Expect100Continue
 
-    try
+    $numRetries = 0
+    do
     {
-        if ($NoStatus)
+        try
         {
-            # Recommendations per https://github.com/Azure/azure-storage-net-data-movement#best-practice
-            [System.Net.ServicePointManager]::DefaultConnectionLimit = [Environment]::ProcessorCount * 8
-            [System.Net.ServicePointManager]::Expect100Continue = $false
-
-            $bytes = [System.IO.File]::ReadAllBytes($azureStorageDll)
-            [System.Reflection.Assembly]::Load($bytes) | Out-Null
-
-            $bytes = [System.IO.File]::ReadAllBytes($azureStorageDataMovementDll)
-            [System.Reflection.Assembly]::Load($bytes) | Out-Null
-
-            $uri = New-Object -TypeName System.Uri -ArgumentList $SasUri
-            $cloudBlockBlob = New-Object -TypeName Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob -ArgumentList $uri
-
-            if ($PSCmdlet.ShouldProcess($FilePath, "CloudBlockBlob.UploadFromFile"))
+            if ($NoStatus)
             {
-                # We will run this async command synchronously within the console.
-                $task = [Microsoft.WindowsAzure.Storage.DataMovement.TransferManager]::UploadAsync($FilePath, $cloudBlockBlob, $null, $null)
-                $task.GetAwaiter().GetResult() | Out-Null
-            }
-        }
-        else
-        {
-            $jobName = "Set-StoreFile-" + (Get-Date).ToFileTime().ToString()
+                # Recommendations per https://github.com/Azure/azure-storage-net-data-movement#best-practice
+                [System.Net.ServicePointManager]::DefaultConnectionLimit = [Environment]::ProcessorCount * 8
+                [System.Net.ServicePointManager]::Expect100Continue = $false
 
-            if ($PSCmdlet.ShouldProcess($jobName, "Start-Job"))
-            {
-                [scriptblock]$scriptBlock = {
-                    param($SasUri, $FilePath, $AzureStorageDll, $AzureStorageDataMovementDll)
+                $bytes = [System.IO.File]::ReadAllBytes($azureStorageDll)
+                [System.Reflection.Assembly]::Load($bytes) | Out-Null
 
-                    # Recommendations per https://github.com/Azure/azure-storage-net-data-movement#best-practice
-                    [System.Net.ServicePointManager]::DefaultConnectionLimit = [Environment]::ProcessorCount * 8
-                    [System.Net.ServicePointManager]::Expect100Continue = $false
+                $bytes = [System.IO.File]::ReadAllBytes($azureStorageDataMovementDll)
+                [System.Reflection.Assembly]::Load($bytes) | Out-Null
 
-                    $bytes = [System.IO.File]::ReadAllBytes($AzureStorageDll)
-                    [System.Reflection.Assembly]::Load($bytes) | Out-Null
+                $uri = New-Object -TypeName System.Uri -ArgumentList $SasUri
+                $cloudBlockBlob = New-Object -TypeName Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob -ArgumentList $uri
 
-                    $bytes = [System.IO.File]::ReadAllBytes($AzureStorageDataMovementDll)
-                    [System.Reflection.Assembly]::Load($bytes) | Out-Null
-
-                    $uri = New-Object -TypeName System.Uri -ArgumentList $SasUri
-                    $cloudBlockBlob = New-Object -TypeName Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob -ArgumentList $uri
-
+                if ($PSCmdlet.ShouldProcess($FilePath, "CloudBlockBlob.UploadFromFile"))
+                {
                     # We will run this async command synchronously within the console.
                     $task = [Microsoft.WindowsAzure.Storage.DataMovement.TransferManager]::UploadAsync($FilePath, $cloudBlockBlob, $null, $null)
                     $task.GetAwaiter().GetResult() | Out-Null
                 }
-
-                $null = Start-Job -Name $jobName -ScriptBlock $scriptBlock -Arg @($SasUri, $FilePath, $azureStorageDll, $azureStorageDataMovementDll)
-
-                if ($PSCmdlet.ShouldProcess($jobName, "Wait-JobWithAnimation"))
-                {
-                    Wait-JobWithAnimation -Name $jobName -Description "Uploading $FilePath"
-                }
-
-                if ($PSCmdlet.ShouldProcess($jobName, "Receive-Job"))
-                {
-                    $null = Receive-Job $jobName -AutoRemoveJob -Wait -ErrorAction SilentlyContinue -ErrorVariable remoteErrors
-                }
             }
-
-            if ($remoteErrors.Count -gt 0)
+            else
             {
-               throw $remoteErrors[0].Exception
+                $jobName = "Set-StoreFile-" + (Get-Date).ToFileTime().ToString()
+
+                if ($PSCmdlet.ShouldProcess($jobName, "Start-Job"))
+                {
+                    [scriptblock]$scriptBlock = {
+                        param($SasUri, $FilePath, $AzureStorageDll, $AzureStorageDataMovementDll)
+
+                        # Recommendations per https://github.com/Azure/azure-storage-net-data-movement#best-practice
+                        [System.Net.ServicePointManager]::DefaultConnectionLimit = [Environment]::ProcessorCount * 8
+                        [System.Net.ServicePointManager]::Expect100Continue = $false
+
+                        $bytes = [System.IO.File]::ReadAllBytes($AzureStorageDll)
+                        [System.Reflection.Assembly]::Load($bytes) | Out-Null
+
+                        $bytes = [System.IO.File]::ReadAllBytes($AzureStorageDataMovementDll)
+                        [System.Reflection.Assembly]::Load($bytes) | Out-Null
+
+                        $uri = New-Object -TypeName System.Uri -ArgumentList $SasUri
+                        $cloudBlockBlob = New-Object -TypeName Microsoft.WindowsAzure.Storage.Blob.CloudBlockBlob -ArgumentList $uri
+
+                        # We will run this async command synchronously within the console.
+                        $task = [Microsoft.WindowsAzure.Storage.DataMovement.TransferManager]::UploadAsync($FilePath, $cloudBlockBlob, $null, $null)
+                        $task.GetAwaiter().GetResult() | Out-Null
+                    }
+
+                    $null = Start-Job -Name $jobName -ScriptBlock $scriptBlock -Arg @($SasUri, $FilePath, $azureStorageDll, $azureStorageDataMovementDll)
+
+                    if ($PSCmdlet.ShouldProcess($jobName, "Wait-JobWithAnimation"))
+                    {
+                        Wait-JobWithAnimation -Name $jobName -Description "Uploading $FilePath"
+                    }
+
+                    if ($PSCmdlet.ShouldProcess($jobName, "Receive-Job"))
+                    {
+                        $null = Receive-Job $jobName -AutoRemoveJob -Wait -ErrorAction SilentlyContinue -ErrorVariable remoteErrors
+                    }
+                }
+
+                if ($remoteErrors.Count -gt 0)
+                {
+                    throw $remoteErrors[0].Exception
+                }
             }
+
+            # Record the telemetry for this event.
+            $stopwatch.Stop()
+            $telemetryMetrics = @{ [StoreBrokerTelemetryMetric]::Duration = $stopwatch.Elapsed.TotalSeconds }
+            Set-TelemetryEvent -EventName Set-StoreFile -Properties $telemetryProperties -Metrics $telemetryMetrics
         }
-
-        # Record the telemetry for this event.
-        $stopwatch.Stop()
-        $telemetryMetrics = @{ [StoreBrokerTelemetryMetric]::Duration = $stopwatch.Elapsed.TotalSeconds }
-        Set-TelemetryEvent -EventName Set-StoreFile -Properties $telemetryProperties -Metrics $telemetryMetrics
-    }
-    catch [System.Management.Automation.RuntimeException]
-    {
-        # This type of exception occurs when NOT using -NoStatus
-
-        $output = @()
-        $output += $_.Exception.Message
-        if (-not [String]::IsNullOrWhiteSpace($_.ErrorDetails.Message))
+        catch [System.Management.Automation.RuntimeException]
         {
-            $message = ($_.ErrorDetails.Message | ConvertFrom-Json)
-            $output += "$($message.code) : $($message.message)"
-            if ($message.details)
+            # This type of exception occurs when NOT using -NoStatus
+
+            $output = @()
+            $output += $_.Exception.Message
+            if (-not [String]::IsNullOrWhiteSpace($_.ErrorDetails.Message))
             {
-                $output += "$($message.details | Format-Table | Out-String)"
+                $message = ($_.ErrorDetails.Message | ConvertFrom-Json)
+                $output += "$($message.code) : $($message.message)"
+                if ($message.details)
+                {
+                    $output += "$($message.details | Format-Table | Out-String)"
+                }
             }
+
+            Set-TelemetryException -Exception $_.Exception -ErrorBucket Set-StoreFile -Properties $telemetryProperties
+            $newLineOutput = ($output -join [Environment]::NewLine)
+            Write-Log -Message $newLineOutput -Level Error
+            throw $newLineOutput
+        }
+        catch
+        {
+            # This type of exception occurs when using -NoStatus
+
+            # Dig into the exception to get the Response details.
+            # Note that value__ is not a typo.
+            $output = @()
+            $output += "StatusCode: $($_.Exception.Response.StatusCode.value__)"
+            $output += "StatusDescription: $($_.Exception.Response.StatusDescription)"
+            $output += $_.ErrorDetails
+
+            Set-TelemetryException -Exception $_.Exception -ErrorBucket Set-StoreFile -Properties $telemetryProperties
+            $newLineOutput = ($output -join [Environment]::NewLine)
+            Write-Log -Message $newLineOutput -Level Error
+            throw $newLineOutput
+        }
+        finally
+        {
+            [System.Net.ServicePointManager]::DefaultConnectionLimit = $origDefaultConnectionLimit
+            [System.Net.ServicePointManager]::Expect100Continue = $origExpect100Continue
         }
 
-        Set-TelemetryException -Exception $_.Exception -ErrorBucket Set-StoreFile -Properties $telemetryProperties
-        $newLineOutput = ($output -join [Environment]::NewLine)
-        Write-Log -Message $newLineOutput -Level Error
-        throw $newLineOutput
+        Write-Log -Message "Successfully uploaded the file." -Level Verbose
+        return
     }
-    catch
-    {
-        # This type of exception occurs when using -NoStatus
-
-        # Dig into the exception to get the Response details.
-        # Note that value__ is not a typo.
-        $output = @()
-        $output += "StatusCode: $($_.Exception.Response.StatusCode.value__)"
-        $output += "StatusDescription: $($_.Exception.Response.StatusDescription)"
-        $output += $_.ErrorDetails
-
-        Set-TelemetryException -Exception $_.Exception -ErrorBucket Set-StoreFile -Properties $telemetryProperties
-        $newLineOutput = ($output -join [Environment]::NewLine)
-        Write-Log -Message $newLineOutput -Level Error
-        throw $newLineOutput
-    }
-    finally
-    {
-        [System.Net.ServicePointManager]::DefaultConnectionLimit = $origDefaultConnectionLimit
-        [System.Net.ServicePointManager]::Expect100Continue = $origExpect100Continue
-    }
-
-    Write-Log -Message "Successfully uploaded the file." -Level Verbose
+    while ($true) # infinite loop for retrying is ok, since we return in the postive case, and throw an exception in the failure case.
 }
 
 function Get-StoreFile
@@ -1012,6 +1018,9 @@ function Get-StoreFile
 
     .PARAMETER FilePath
         The local path that you want to store the downloaded file.
+
+    .PARAMETER Force
+        If specified, will overwrite the destination file at FilePath if it already exists.
 
     .PARAMETER NoStatus
         If this switch is specified, long-running commands will run on the main thread
@@ -1044,14 +1053,27 @@ function Get-StoreFile
         [string] $SasUri,
 
         [Parameter(Mandatory)]
-        [ValidateScript({if (Test-Path -Path $_ -PathType Leaf) { throw "$_ already exists. Choose a different destination name." } else { $true }})]
         [string] $FilePath,
+
+        [switch] $Force,
 
         [switch] $NoStatus
     )
 
     # Let's resolve this path to a full path so that it works with non-PowerShell commands (like the Azure module)
     $FilePath = Resolve-UnverifiedPath -Path $FilePath
+
+    if (Test-Path -Path $FilePath -PathType Leaf)
+    {
+        if ($Force)
+        {
+            $null = Remove-Item -Path $FilePath -Force
+        }
+        else
+        {
+            throw "[$FilePath] already exists. Choose a different destination name."
+        }
+    }
 
     # Telemetry-related
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
