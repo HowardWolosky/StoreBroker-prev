@@ -213,6 +213,7 @@ function Test-AssemblyIsDesiredVersion
     {
         if ($splitSourceVer[$i] -ne $splitTargetVer[$i])
         {
+            Write-Log -Message "[$AssemblyPath] has version [$versionInfo] which didn't match [$DesiredVersion]." -Level Verbose
             return $false
         }
     }

@@ -144,7 +144,9 @@
         'Set-StoreFile',
         'Start-ApplicationFlightSubmissionMonitor',
         'Start-InAppProductSubmissionMonitor',
-        'Start-SubmissionMonitor')
+        'Start-SubmissionMonitor',
+        'Test-AssemblyIsDesiredVersion',
+        'Get-AzureStorageDllPath')
 
     AliasesToExport = @(
         'Delete-Product',
