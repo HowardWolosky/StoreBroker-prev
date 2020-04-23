@@ -168,7 +168,7 @@ function New-Product
         $body = Get-JsonBody -InputObject $hashBody
 
         $params = @{
-            "UriFragment" = "products/"
+            "UriFragment" = "products?parentProductId=$ProductId"
             "Method" = "Post"
             "Description" = "Creating a new product called: $Name"
             "Body" = $body
